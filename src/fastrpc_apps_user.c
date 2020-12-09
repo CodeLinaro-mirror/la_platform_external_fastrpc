@@ -90,6 +90,8 @@
 #define INVALID_KEY    (pthread_key_t)(-1)
 
 #define MAX_DMA_HANDLES 256
+#define MAX_DSPPD_NAMELEN  20
+#define MAX_DLERRSTR_LEN 255
 
 #define FASTRPC_TRACE_INVOKE_START "fastrpc_trace_invoke_start"
 #define FASTRPC_TRACE_INVOKE_END   "fastrpc_trace_invoke_end"
@@ -375,6 +377,7 @@ void *remote_register_fd(int fd, int size) {
 static void remote_register_buf_common(void* buf, int size, int fd, int attr) {
    int nErr = 0;
    VERIFY(!fastrpc_init_once());
+   VERIFYC(NULL != buf, AEE_EBADPARM);
    if(fd != -1) {
       struct mem_to_fd* tofd;
       int fdfound = 0;
@@ -923,14 +926,23 @@ bail:
 
 int remote_handle_close(remote_handle h)
 {
-   char dlerrstr[255];
+   char *dlerrstr = NULL;
    int dlerr = 0, nErr = AEE_SUCCESS;
 
    VERIFY(AEE_SUCCESS == (nErr = remotectl_close(h, dlerrstr, sizeof(dlerrstr), &dlerr)));
+   size_t err_str_len = MAX_DLERRSTR_LEN*sizeof(char);
+
+   pthread_mutex_lock(&update_hlist_mut);
+   VERIFYC(NULL != (dlerrstr = (char*)calloc(1, err_str_len)), AEE_ENOMEMORY);
+   VERIFY(AEE_SUCCESS == (nErr = remotectl_close(h, dlerrstr, err_str_len, &dlerr)));
    VERIFY(AEE_SUCCESS == (nErr = dlerr));
 bail:
    if (nErr != AEE_SUCCESS) {
 	FARF(HIGH, "Error %x: remote handle close failed. error %s\n", nErr, dlerrstr);
+   }
+   if (dlerrstr) {
+      free(dlerrstr);
+      dlerrstr = NULL;
    }
    return nErr;
 }
