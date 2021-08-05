@@ -1,6 +1,6 @@
 /*
-/*
- * Copyright (c) 2019, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2019, 2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -560,23 +560,19 @@ static int fdlist_fd_from_buf(void* buf, int bufLen, int* nova, void** base, int
    return 0;
 }
 
-static inline int is_valid_local_handle(struct handle_info* hinfo) {
+static inline bool is_valid_local_handle(struct handle_info* hinfo) {
 	int domain = 0;
-	QNode* pn = NULL;
-	struct handle_info* hi = NULL;
+	QNode* pn;
 
 	for (domain = 0; domain < NUM_DOMAINS_EXTEND; domain++) {
-		pthread_mutex_lock(&hlist[domain].mut);
 		QLIST_FOR_ALL(&hlist[domain].ql, pn) {
-			hi = STD_RECOVER_REC(struct handle_info, qn, pn);
+			struct handle_info* hi = STD_RECOVER_REC(struct handle_info, qn, pn)
 			if (hi == hinfo) {
-				pthread_mutex_unlock(&hlist[domain].mut);
-				return 1;
+				return true;
 			}
 		}
-		pthread_mutex_unlock(&hlist[domain].mut);
 	}
-	return 0;
+	return false;
 }
 
 static int verify_local_handle(remote_handle64 local) {
@@ -584,7 +580,7 @@ static int verify_local_handle(remote_handle64 local) {
 	int nErr = AEE_SUCCESS;
 
 	VERIFYC(hinfo, AEE_EMEMPTR);
-	VERIFYC(is_valid_local_handle(hinfo), AEE_EBADHANDLE);
+	VERIFYC(is_valid_local_handle(hinfo), AEE_EINVHANDLE);
 	VERIFYC((hinfo->hlist >= &hlist[0]) && (hinfo->hlist < &hlist[NUM_DOMAINS_EXTEND]), AEE_EMEMPTR);
 	VERIFYC(QNode_IsQueuedZ(&hinfo->qn), AEE_ENOSUCHHANDLE);
 bail:
